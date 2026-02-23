@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# uv
+.uv/
+
+# macOS
+.DS_Store
+
+# API keys / config
+.sttcli.toml
+.env
+
+# Whisper model cache
+~/.cache/whisper/
+
+# Benchmark / transcript outputs
+*_benchmark/
+*.transcript.md
+
+# Audio/video files
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.flac
+*.aac
+*.ogg
+*.mkv
+*.mov
