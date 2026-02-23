@@ -28,10 +28,26 @@ class MarkdownFormatter(BaseFormatter):
             f"| Model    | {result.model} |",
             f"| Language | {result.language} |",
             f"| Duration | {_fmt_duration(result.duration)} |",
-            "",
-            "---",
-            "",
         ]
+
+        # Add gender metadata rows
+        has_speakers = any(seg.speaker for seg in result.segments)
+        if has_speakers:
+            seen: dict[str, str] = {}
+            for seg in result.segments:
+                if seg.speaker and seg.gender and seg.speaker not in seen:
+                    seen[seg.speaker] = seg.gender
+            for speaker, gender in sorted(seen.items()):
+                lines.append(f"| {speaker}_gender | {gender} |")
+        else:
+            first_gender = next(
+                (seg.gender for seg in result.segments if seg.gender), None
+            )
+            if first_gender:
+                lines.append(f"| Gender   | {first_gender} |")
+
+        lines += ["", "---", ""]
+
         for seg in result.segments:
             start = _fmt_time(seg.start)
             end = _fmt_time(seg.end)

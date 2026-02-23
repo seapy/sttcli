@@ -24,8 +24,9 @@ _RESPONSE_SCHEMA = {
             "start": {"type": "string"},
             "end": {"type": "string"},
             "text": {"type": "string"},
+            "gender": {"type": "string", "enum": ["male", "female"]},
         },
-        "required": ["start", "end", "text"],
+        "required": ["start", "end", "text", "gender"],
     },
 }
 
@@ -38,8 +39,9 @@ _RESPONSE_SCHEMA_DIARIZE = {
             "end": {"type": "string"},
             "text": {"type": "string"},
             "speaker": {"type": "string"},
+            "gender": {"type": "string", "enum": ["male", "female"]},
         },
-        "required": ["start", "end", "text", "speaker"],
+        "required": ["start", "end", "text", "speaker", "gender"],
     },
 }
 
@@ -70,14 +72,16 @@ class GeminiProvider(BaseProvider):
         step.advance_to(40, "Generating transcript...")
         prompt = (
             "Transcribe this audio into timestamped segments. "
-            "Use MM:SS format for start and end times (e.g. '00:03', '01:24')."
+            "Use MM:SS format for start and end times (e.g. '00:03', '01:24'). "
+            "Detect the speaker's gender ('male' or 'female') based on voice characteristics."
         )
         if self.language:
             prompt += f" Output language: {self.language}."
         if self.diarize:
             prompt += (
                 " Identify speakers as SPEAKER_00, SPEAKER_01, etc. "
-                "Split segments at speaker boundaries."
+                "Split segments at speaker boundaries. "
+                "Assign the correct gender for each speaker."
             )
             if self.num_speakers:
                 prompt += f" There are {self.num_speakers} speakers."
@@ -111,6 +115,7 @@ class GeminiProvider(BaseProvider):
                 end=_mmss_to_seconds(item["end"]),
                 text=item["text"].strip(),
                 speaker=item.get("speaker") or None,
+                gender=item.get("gender") or None,
             )
             for item in raw
         ]

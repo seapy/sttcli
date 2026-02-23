@@ -7,6 +7,7 @@ class Segment:
     end: float
     text: str
     speaker: str | None = field(default=None)
+    gender: str | None = field(default=None)
 
 
 @dataclass

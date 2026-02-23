@@ -43,12 +43,12 @@ Accepts audio files (mp3, wav, flac, m4a, etc.) and video files (mp4, mkv, mov, 
 
 ### Providers
 
-| Provider | Default model | Diarization | Notes |
-|---|---|---|---|
-| `whisper` | turbo | ❌ | Local, no API key required |
-| `openai` | whisper-1 | ❌ | 25 MB file size limit |
-| `gemini` | gemini-2.5-flash | ✅ | Prompt-based |
-| `elevenlabs` | scribe_v2 | ✅ | Native, word-level timestamps |
+| Provider | Default model | Diarization | Gender detection | Notes |
+|---|---|---|---|---|
+| `whisper` | turbo | ❌ | pitch analysis | Local, no API key required |
+| `openai` | whisper-1 | ❌ | pitch analysis | 25 MB file size limit |
+| `gemini` | gemini-2.5-flash | ✅ | Gemini (in-call) | Prompt-based |
+| `elevenlabs` | scribe_v2 | ✅ | pitch analysis | Native, word-level timestamps |
 
 ```bash
 sttcli audio.mp3                            # default (whisper)
@@ -78,6 +78,39 @@ sttcli audio.mp3 -f srt -o subtitle.srt
 sttcli audio.mp3 --language ko              # language hint
 sttcli audio.mp3 --provider whisper --model large-v3   # override model
 sttcli audio.mp3 --provider gemini --model gemini-2.5-pro
+```
+
+## Gender Detection
+
+sttcli automatically detects speaker gender for every transcription.
+
+- **Gemini**: detected in the same API call — no extra cost or time
+- **ElevenLabs / Whisper / OpenAI**: detected via pitch (F0) analysis using ffmpeg + numpy — no additional dependencies
+
+Gender is included in all output formats.
+
+**markdown** — added to the metadata table:
+```
+| Gender   | male |                    # single speaker
+| SPEAKER_00_gender | male |           # diarized
+| SPEAKER_01_gender | female |
+```
+
+**srt** — included in the speaker label:
+```
+[speaker_0 (male)] You mentioned that...
+[female] ...                            # no diarization
+```
+
+**text** — included in the speaker header:
+```
+speaker_0 (male):
+You mentioned that...
+```
+
+**json** — added as a `gender` field on each segment:
+```json
+{ "start": 3.0, "end": 9.0, "text": "...", "speaker": "speaker_0", "gender": "male" }
 ```
 
 ## Speaker Diarization

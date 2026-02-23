@@ -9,6 +9,7 @@ import click
 from sttcli.audio import extract_audio, get_duration, is_video
 from sttcli.config import resolve_api_key
 from sttcli.formatters import get_formatter
+from sttcli.gender import detect_gender, detect_genders_per_speaker
 from sttcli.progress import make_progress, StepProgress
 from sttcli.providers import get_provider
 
@@ -109,6 +110,27 @@ def transcribe(
 
             trans_step = StepProgress(progress, "Transcribing...", total=100)
             result = provider.transcribe(audio_path, trans_step)
+
+            # Skip pitch-based detection if the provider already supplied gender
+            # (e.g. Gemini returns it directly from the transcription call).
+            already_detected = any(seg.gender for seg in result.segments)
+            if already_detected:
+                gender_step = StepProgress(progress, "Gender detected by provider", total=100)
+                gender_step.advance_to(100, "Done")
+            else:
+                gender_step = StepProgress(progress, "Detecting speaker gender...", total=100)
+                gender_step.advance_to(0)
+                has_speakers = any(seg.speaker for seg in result.segments)
+                if has_speakers:
+                    genders = detect_genders_per_speaker(str(audio_path), result.segments)
+                    for seg in result.segments:
+                        if seg.speaker and seg.speaker in genders:
+                            seg.gender = genders[seg.speaker]
+                else:
+                    detected = detect_gender(str(audio_path))
+                    for seg in result.segments:
+                        seg.gender = detected
+                gender_step.advance_to(100, "Done")
 
             fmt_step = StepProgress(progress, "Formatting output...", total=100)
             fmt_step.advance_to(50)

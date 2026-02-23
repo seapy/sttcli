@@ -42,22 +42,33 @@ input file
 ```
 
 ### Core models (`models.py`)
-- `Segment(start, end, text, speaker=None)` — one timestamped chunk
+- `Segment(start, end, text, speaker=None, gender=None)` — one timestamped chunk
 - `TranscriptResult(segments, language, duration, provider, model, source_file)`
 
 ### Provider system (`providers/`)
 All providers extend `BaseProvider(model, language, api_key, device, diarize, num_speakers)`.
 
-| Provider | Module | Default model | Diarize |
-|---|---|---|---|
-| `whisper` | `whisper_local.py` | `turbo` | ❌ |
-| `openai` | `openai_api.py` | `whisper-1` | ❌ (25 MB limit) |
-| `gemini` | `gemini.py` | `gemini-2.5-flash` | ✅ prompt-based, JSON schema |
-| `elevenlabs` | `elevenlabs.py` | `scribe_v2` | ✅ native `diarize=True` |
+| Provider | Module | Default model | Diarize | Gender detection |
+|---|---|---|---|---|
+| `whisper` | `whisper_local.py` | `turbo` | ❌ | pitch analysis |
+| `openai` | `openai_api.py` | `whisper-1` | ❌ (25 MB limit) | pitch analysis |
+| `gemini` | `gemini.py` | `gemini-2.5-flash` | ✅ prompt-based, JSON schema | in-call (JSON schema) |
+| `elevenlabs` | `elevenlabs.py` | `scribe_v2` | ✅ native `diarize=True` | pitch analysis |
 
 ElevenLabs groups word-level timestamps into segments in `_group_words()`, splitting on sentence endings, long silences (>1s), or speaker changes when diarizing.
 
-Gemini uploads the file, polls until `PROCESSING` completes, sends a structured JSON schema prompt, then deletes the file. Timestamps come back as `MM:SS` strings parsed by `_mmss_to_seconds()`.
+Gemini uploads the file, polls until `PROCESSING` completes, sends a structured JSON schema prompt, then deletes the file. Timestamps come back as `MM:SS` strings parsed by `_mmss_to_seconds()`. The JSON schema includes a `gender` field (`"male"` | `"female"`) so gender is detected in the same API call.
+
+### Gender detection (`gender.py`)
+Used for providers that don't return gender natively (whisper, openai, elevenlabs).
+
+- Extracts mono 16 kHz PCM via ffmpeg
+- Estimates fundamental frequency (F0) per frame using autocorrelation
+- Classifies: median F0 ≥ 165 Hz → `female`, < 165 Hz → `male`
+- `detect_gender(audio_path, start, end)` — single speaker / full audio
+- `detect_genders_per_speaker(audio_path, segments)` — aggregates F0 per speaker across all their segments
+
+`cli.py` skips pitch detection if the provider already populated `Segment.gender` (i.e. Gemini).
 
 ### CLI (`cli.py`)
 Uses a `_SmartCLI` Click group: unknown first arguments are automatically routed to the `transcribe` subcommand, preserving backward compatibility (`sttcli audio.mp3` = `sttcli transcribe audio.mp3`).
@@ -70,8 +81,9 @@ Subcommands: `transcribe`, `benchmark`.
 `run_benchmark()` accepts `provider_specs` as `["elevenlabs:scribe_v1", "gemini", ...]`. The `provider:model` format overrides the provider's `default_model`. Audio is extracted once and reused across all providers. Returns `list[BenchmarkEntry]` with `label`, `result`, `error`, `diarized`.
 
 ### Formatters (`formatters/`)
-- `markdown.py` — bold timestamps, bold speaker badge if present
-- `srt.py` — standard SRT with `[SPEAKER_XX]` prefix when diarized
-- `json_fmt.py` — adds `"speaker"` key to all segments only if any segment has a speaker
-- `text.py` — inserts `SPEAKER_XX:` header lines on speaker change
+All formatters include gender in their output when available.
+- `markdown.py` — gender rows in header table: `| Gender | male |` (single speaker) or `| speaker_0_gender | male |` (diarized); segment lines unchanged for ttscli parser compatibility
+- `srt.py` — `[speaker_0 (male)]` or `[male]` prefix
+- `json_fmt.py` — adds `"speaker"` and `"gender"` keys when present
+- `text.py` — `speaker_0 (male):` header on speaker change
 - `html_compare.py` — self-contained HTML, CSS grid of cards per provider, deterministic speaker colors from `_PALETTE`

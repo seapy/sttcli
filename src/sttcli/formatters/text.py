@@ -10,7 +10,8 @@ class TextFormatter(BaseFormatter):
             if seg.speaker is not None and seg.speaker != prev_speaker:
                 if lines:
                     lines.append("")
-                lines.append(f"{seg.speaker}:")
+                header = f"{seg.speaker} ({seg.gender})" if seg.gender else seg.speaker
+                lines.append(f"{header}:")
                 prev_speaker = seg.speaker
             lines.append(seg.text)
         return "\n".join(lines) + "\n"
